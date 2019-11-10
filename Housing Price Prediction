@@ -1,0 +1,69 @@
+import pandas as pd
+import numpy as np
+
+# Function to load data from csv file
+def load_csv(file_path):
+    housing_data = pd.read_csv(file_path)
+    return housing_data
+
+# Loading Data
+housing_data = load_csv('housing.csv')
+
+#Take a quick look at the data structure
+housing_data.head()
+
+# Check the if null values are present
+housing_data.info()
+
+# Check the categories of ocean_proximity
+housing_data['ocean_proximity'].value_counts()
+
+# Plot a histogram to see a graphical representation
+%matplotlib inline  #Works only in jupyter notebook
+import matplotlib.pyplot as plt
+
+housing_data.hist(bins=50, figsize=(20,15))
+
+""" Things to notice from the above histogram
+1. Median income attribute does not look like it is expressed in USD.
+After checking with the team that collected the data, you are told that the data has been scaled and capped at 15 for higher median incomes
+and at 0.5 for lower median incomes.
+2. Housing median age and the median house value also look to be capped.
+Capping of Median house value may pose serious problem because that is our label. ML algorithm will not be able to learn effectively with capped labels.
+To rectify this issue:
+a) Collect proper labels for the districts whose labels were capped.
+b) Remove those districts from the data set
+3. Each attribute has very different scale. We will have to do feature scaling to bring them to same scale.
+4. Many histograms are tail heavy. They extend much father to the right of the median than to the left. 
+This may make it a bit harder for some ML algorithms to detect patterns. We will try transforming these attributes to have more bell-shaped distributions.
+"""
+
+# Split the dataset into train and test by maintaining the proportion of median income in both sets
+# Median income ranges from 0.5 to 15 with lots of values between 2-6
+# Let us create 5 categories. We will move all the values greater than 7.5 to category 5
+housing_data['income_cat']=np.ceil(housing_data['median_income']/1.5)
+housing_data['income_cat'].where(housing_data['income_cat']<5, 5.0, inplace=True)
+
+from sklearn.model_selection import StratifiedShuffleSplit
+
+split = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+for train_index, test_index in split.split(housing_data, housing_data['income_cat']):
+    strat_train_set = housing_data.loc[train_index]
+    strat_test_set = housing_data.loc[test_index]
+ 
+#Compare ratios in both train and test set. They should be similar
+strat_test_set['income_cat'].value_counts()/len(strat_test_set)
+strat_train_set['income_cat'].value_counts()/len(strat_train_set)
+ 
+ # Remove the income_cat column
+for set_ in (strat_train_set, strat_test_set):
+    set_.drop('income_cat', axis=1, inplace=True)
+    
+# Discover and visualize the data to gain insights
+
+# Create a copy of the training set and analyse it graphically
+train_copy = strat_train_set.copy()
+
+#Since there is latitude and longitude values, we can visualize the area using scatter plot
+# Set alpha=0.1 to get a feel of the density of values
+train_copy.plot(kind='scatter',  x='longitude', y='latitude', alpha=0.1)
